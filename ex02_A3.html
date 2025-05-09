@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Complex Stimuli Test (B.3)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+    }
+    #image-container {
+      margin-top: 20px;
+    }
+    #stimulus-img {
+      max-width: 500px;
+      height: auto;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Complex Stimuli Test (B.3)</h1>
+
+  <div id="demographics">
+    <h2>Demographic Data</h2>
+    <label>Age: <input type="number" id="age" required></label><br><br>
+    <label>Gender: 
+      <select id="gender">
+        <option value="">--Select--</option>
+        <option value="female">Female</option>
+        <option value="male">Male</option>
+        <option value="other">Other</option>
+      </select>
+    </label><br><br>
+    <label>Nationality: <input type="text" id="nationality" required></label><br><br>
+    <button onclick="startExperiment()">Start Test</button>
+  </div>
+
+  <div id="experiment" class="hidden">
+    <h2 id="instruction">Press D for German, F for Chinese, G for Mexican</h2>
+    <div id="image-container">
+      <img id="stimulus-img" src="" alt="Stimulus">
+    </div>
+  </div>
+
+  <div id="results" class="hidden">
+    <h2>Results</h2>
+    <pre id="result-output"></pre>
+    <button onclick="downloadResults()">Download Results</button>
+  </div>
+
+  <script>
+    const imageCount = 10;
+    const countries = ['germany', 'china', 'mexico'];
+    const keyBindings = { 'd': 'germany', 'f': 'china', 'g': 'mexico' };
+    let imageList = [];
+    let currentImageIndex = 0;
+    let currentStartTime;
+
+    let results = {
+      germany: [],
+      china: [],
+      mexico: [],
+    };
+    let errors = {
+      germany: 0,
+      china: 0,
+      mexico: 0,
+    };
+
+    let demographics = {};
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function generateImageList() {
+      const list = [];
+      for (let country of countries) {
+        for (let i = 1; i <= imageCount; i++) {
+          list.push({ country: country, filename: `${country}${i}.jpg` });
+        }
+      }
+      shuffle(list);
+      return list;
+    }
+
+    function startExperiment() {
+      const age = document.getElementById('age').value;
+      const gender = document.getElementById('gender').value;
+      const nationality = document.getElementById('nationality').value;
+
+      if (!age || !gender || !nationality) {
+        alert("Please complete all demographic fields.");
+        return;
+      }
+
+      demographics = { age, gender, nationality };
+
+      document.getElementById('demographics').classList.add('hidden');
+      document.getElementById('experiment').classList.remove('hidden');
+
+      imageList = generateImageList();
+      currentImageIndex = 0;
+      results = { germany: [], china: [], mexico: [] };
+      errors = { germany: 0, china: 0, mexico: 0 };
+
+      showNextImage();
+    }
+
+    function showNextImage() {
+      if (currentImageIndex >= imageList.length) {
+        showResults();
+        return;
+      }
+
+      const imgData = imageList[currentImageIndex];
+      const imgElement = document.getElementById('stimulus-img');
+      imgElement.src = `images/${imgData.filename}`;
+      currentStartTime = Date.now();
+    }
+
+    function showResults() {
+      document.getElementById('experiment').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+
+      function mean(arr) {
+        return arr.reduce((a, b) => a + b, 0) / arr.length;
+      }
+
+      function stddev(arr) {
+        const m = mean(arr);
+        return Math.sqrt(arr.map(x => (x - m) ** 2).reduce((a, b) => a + b, 0) / arr.length);
+      }
+
+      let output = `--- Demographic Info ---\n`;
+      output += `Age: ${demographics.age}\nGender: ${demographics.gender}\nNationality: ${demographics.nationality}\n\n`;
+
+      for (let country of countries) {
+        const times = results[country];
+        const m = times.length ? mean(times).toFixed(1) : 'N/A';
+        const sd = times.length ? stddev(times).toFixed(1) : 'N/A';
+        const err = errors[country];
+        output += `${country.toUpperCase()}:\n  Mean: ${m} ms\n  StdDev: ${sd} ms\n  Errors: ${err}\n\n`;
+      }
+
+      document.getElementById('result-output').textContent = output;
+    }
+
+    function downloadResults() {
+      const data = document.getElementById('result-output').textContent;
+      const blob = new Blob([data], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reaction_results_${demographics.nationality}_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (!['d', 'f', 'g'].includes(key) || currentImageIndex >= imageList.length) return;
+
+      const responseTime = Date.now() - currentStartTime;
+      const correctCountry = imageList[currentImageIndex].country;
+      const userAnswer = keyBindings[key];
+
+      if (userAnswer === correctCountry) {
+        results[correctCountry].push(responseTime);
+      } else {
+        errors[correctCountry]++;
+      }
+
+      currentImageIndex++;
+      showNextImage();
+    });
+  </script>
+</body>
+</html>
